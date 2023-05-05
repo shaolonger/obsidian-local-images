@@ -9,7 +9,7 @@ import {
 import safeRegex from "safe-regex";
 
 import { imageTagProcessor } from "./contentProcessor";
-import { replaceAsync, cleanContent } from "./utils";
+import { replaceAsync, cleanContent, cleanFileName } from "./utils";
 import {
   ISettings,
   DEFAULT_SETTINGS,
@@ -17,6 +17,7 @@ import {
   ANY_URL_PATTERN,
   NOTICE_TIMEOUT,
   TIMEOUT_LIKE_INFINITY,
+  FORBIDDEN_SYMBOLS_FILENAME_PATTERN,
 } from "./config";
 import { UniqueQueue } from "./uniqueQueue";
 
@@ -29,7 +30,14 @@ export default class LocalImagesPlugin extends Plugin {
     // const content = await this.app.vault.read(file);
     const content = await this.app.vault.cachedRead(file);
 
-    await this.ensureFolderExists(this.settings.mediaRootDirectory);
+    const basename = file.basename.replace(
+      FORBIDDEN_SYMBOLS_FILENAME_PATTERN,
+      this.settings.emptyStringPlaceholder
+    );
+    const mediaSaveFolder = `${file.parent.path}/${this.settings.mediaRelativeDirectory}/${basename}`;
+    const mdStrReplaceFolder = `./${this.settings.mediaRelativeDirectory}/${basename}`;
+
+    await this.ensureFolderExists(mediaSaveFolder);
 
     const cleanedContent = this.settings.cleanContent
       ? cleanContent(content)
@@ -37,7 +45,7 @@ export default class LocalImagesPlugin extends Plugin {
     const fixedContent = await replaceAsync(
       cleanedContent,
       EXTERNAL_MEDIA_LINK_PATTERN,
-      imageTagProcessor(this.app, this.settings.mediaRootDirectory)
+      imageTagProcessor(this.app, mediaSaveFolder, mdStrReplaceFolder)
     );
 
     if (content != fixedContent) {
@@ -336,6 +344,30 @@ class SettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.mediaRootDirectory)
           .onChange(async (value) => {
             this.plugin.settings.mediaRootDirectory = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Relative folder")
+      .setDesc("Folder to keep all downloaded media files with relative path.")
+      .addText((text) =>
+        text
+          .setValue(this.plugin.settings.mediaRelativeDirectory)
+          .onChange(async (value) => {
+            this.plugin.settings.mediaRelativeDirectory = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Empty string placeholder")
+      .setDesc("Placeholder to replace empty string on folder or filename.")
+      .addText((text) =>
+        text
+          .setValue(this.plugin.settings.emptyStringPlaceholder)
+          .onChange(async (value) => {
+            this.plugin.settings.emptyStringPlaceholder = value;
             await this.plugin.saveSettings();
           })
       );

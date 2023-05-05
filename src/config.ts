@@ -26,6 +26,8 @@ export interface ISettings {
   showNotifications: boolean;
   include: string;
   mediaRootDirectory: string;
+  mediaRelativeDirectory: string;
+  emptyStringPlaceholder: string;
 }
 
 export const DEFAULT_SETTINGS: ISettings = {
@@ -36,4 +38,6 @@ export const DEFAULT_SETTINGS: ISettings = {
   showNotifications: false,
   include: ".*\\.md",
   mediaRootDirectory: "media",
+  mediaRelativeDirectory: "_resources",
+  emptyStringPlaceholder: "__",
 };

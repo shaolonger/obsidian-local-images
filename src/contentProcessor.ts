@@ -17,7 +17,11 @@ import {
 } from "./config";
 import { linkHashes } from "./linksHash";
 
-export function imageTagProcessor(app: App, mediaDir: string) {
+export function imageTagProcessor(
+  app: App,
+  mediaDir: string,
+  mdStrReplaceFolder: string
+) {
   async function processImageTag(match: string, anchor: string, link: string) {
     if (!isUrl(link)) {
       return match;
@@ -31,20 +35,22 @@ export function imageTagProcessor(app: App, mediaDir: string) {
       let attempt = 0;
       while (attempt < FILENAME_ATTEMPTS) {
         try {
-          const { fileName, needWrite } = await chooseFileName(
-            app.vault.adapter,
-            mediaDir,
-            anchor,
-            link,
-            fileData
-          );
+          const { fileName, needWrite, mdReplaceFileName } =
+            await chooseFileName(
+              app.vault.adapter,
+              mediaDir,
+              mdStrReplaceFolder,
+              anchor,
+              link,
+              fileData
+            );
 
           if (needWrite && fileName) {
             await app.vault.createBinary(fileName, fileData);
           }
 
           if (fileName) {
-            return `![${anchor}](${fileName})`;
+            return `![${anchor}](${mdReplaceFileName})`;
           } else {
             return match;
           }
@@ -69,13 +75,18 @@ export function imageTagProcessor(app: App, mediaDir: string) {
 async function chooseFileName(
   adapter: DataAdapter,
   dir: string,
+  mdDir: string,
   baseName: string,
   link: string,
   contentData: ArrayBuffer
-): Promise<{ fileName: string; needWrite: boolean }> {
+): Promise<{
+  fileName: string;
+  needWrite: boolean;
+  mdReplaceFileName: string;
+}> {
   const fileExt = await fileExtByContent(contentData);
   if (!fileExt) {
-    return { fileName: "", needWrite: false };
+    return { fileName: "", needWrite: false, mdReplaceFileName: "" };
   }
   // if there is no anchor try get file name from url
   if (!baseName) {
@@ -96,12 +107,16 @@ async function chooseFileName(
   baseName = cleanFileName(baseName);
 
   let fileName = "";
+  let mdReplaceFileName = "";
   let needWrite = true;
   let index = 0;
   while (!fileName && index < MAX_FILENAME_INDEX) {
     const suggestedName = index
       ? pathJoin(dir, `${baseName}-${index}.${fileExt}`)
       : pathJoin(dir, `${baseName}.${fileExt}`);
+    const mdName = index
+      ? pathJoin(mdDir, `${baseName}-${index}.${fileExt}`)
+      : pathJoin(mdDir, `${baseName}.${fileExt}`);
 
     if (await adapter.exists(suggestedName, false)) {
       linkHashes.ensureHashGenerated(link, contentData);
@@ -111,9 +126,11 @@ async function chooseFileName(
       if (linkHashes.isSame(link, fileData)) {
         fileName = suggestedName;
         needWrite = false;
+        mdReplaceFileName = mdName;
       }
     } else {
       fileName = suggestedName;
+      mdReplaceFileName = mdName;
     }
 
     index++;
@@ -124,5 +141,5 @@ async function chooseFileName(
 
   linkHashes.ensureHashGenerated(link, contentData);
 
-  return { fileName, needWrite };
+  return { fileName, mdReplaceFileName, needWrite };
 }
