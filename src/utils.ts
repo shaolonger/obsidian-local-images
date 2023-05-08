@@ -11,12 +11,15 @@ It will be better to do it type-correct.
 
 */
 export async function replaceAsync(str: any, regex: any, asyncFn: any) {
-  const promises: Promise<any>[] = [];
+  const list: any = [];
   str.replace(regex, (match: string, ...args: any) => {
-    const promise = asyncFn(match, ...args);
-    promises.push(promise);
+    list.push({ match, args });
   });
-  const data = await Promise.all(promises);
+  const data: any = [];
+  for (const item of list) {
+    const res = await asyncFn(item.match, ...item.args);
+    data.push(res);
+  }
   return str.replace(regex, () => data.shift());
 }
 
